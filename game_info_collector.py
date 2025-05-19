@@ -9,7 +9,7 @@ s = requests.Session()
 
 class GameTextData:
 
-    def __init__(self, app_id, language="all", from_days=0, total_reviews=1000):
+    def __init__(self, app_id, language="all", from_days=0, total_reviews=100):
         self.app_id = app_id
         self.steam_game_url = (
             f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=ae"
@@ -90,7 +90,7 @@ class GameTextData:
         cursor = "*"
         review_texts = []
 
-        for i in range(0, self.review_info["total_review_count"]):
+        for i in range(0, self.total_reviews):
 
             steam_url = (
                 self.base_review_url
@@ -113,8 +113,8 @@ class GameTextData:
         self._get_review_info()
 
         full_data = self.game_info | self.review_info
-        full_data["review_data"] = self._get_review_data()
+        review_data = self._get_review_data()
 
-        return full_data
+        return full_data, review_data
 
     # steam_url = base_steam_url + f"&cursor={quote(cursor)}"
