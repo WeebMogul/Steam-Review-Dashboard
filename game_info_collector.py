@@ -3,8 +3,7 @@ import json
 from bs4 import BeautifulSoup
 import time
 from urllib.parse import urlparse, quote
-
-s = requests.Session()
+from concurrent.futures import ThreadPoolExecutor
 
 
 class GameTextData:
@@ -21,23 +20,37 @@ class GameTextData:
         self.review_info = {}
         self.till_date = from_days
         self.total_reviews = total_reviews
+        self.session = requests.Session()
+        self.headers = {
+            "Cookie": "browserid=332813660915616257; steamCountry=AE%7C3619e5ce7302a0532b2a87b7028eee57"
+        }
 
     def _get_game_info(self):
 
-        game_json = json.loads(s.get(self.steam_game_url).text)
+        game_json = json.loads(
+            self.session.get(self.steam_game_url, headers=self.headers).text
+        )
         game_data = game_json[f"{self.app_id}"]["data"]
 
         self.game_info["game_name"] = game_data["name"]
         self.game_info["required_age"] = game_data["required_age"]
         self.game_info["game_publishers"] = game_data["publishers"]
         self.game_info["game_developers"] = game_data["developers"]
+        self.game_info["game_market_url"] = (
+            f"https://store.steampowered.com/app/{self.app_id}"
+        )
 
-        if game_data["is_free"] == False:
+        if game_data["is_free"] is False:
             self.game_info["game_price"] = game_data["price_overview"][
                 "final_formatted"
             ]
         else:
             self.game_info["game_price"] = "Free"
+
+        if game_data["release_date"]["coming_soon"] is False:
+            self.game_info["game_release_date"] = game_data["release_date"]["date"]
+        else:
+            self.game_info["game_release_date"] = "Coming Soon"
 
         self.game_info["game_categories"] = list(
             map(lambda category: category["description"], game_data["categories"])
@@ -50,9 +63,11 @@ class GameTextData:
         self.game_info["header_image"] = game_data["header_image"]
         self.game_info["short_description"] = game_data["short_description"]
 
+        return self.game_info
+
     def _get_review_info(self):
 
-        review_data = json.loads(s.get(url=self.base_review_url).text)
+        review_data = json.loads(self.session.get(url=self.base_review_url).text)
 
         self.review_info["positive_review_count"] = review_data["query_summary"][
             "total_positive"
@@ -81,6 +96,8 @@ class GameTextData:
             2,
         )
 
+        return self.review_info
+
     # def game_info(self):
 
     #     return self._get_game_info() | self._get_review_info()
@@ -90,31 +107,41 @@ class GameTextData:
         cursor = "*"
         review_texts = []
 
-        for i in range(0, self.total_reviews):
+        num_requests = min(5, (self.total_reviews + 99) // 100)
+
+        for i in range(num_requests):
 
             steam_url = (
                 self.base_review_url
                 + f"&language={self.language}&day_range={self.till_date}&cursor={cursor}"
             )
 
-            review_json = json.loads(s.get(url=steam_url).text)
-            review_texts.extend(review_json["reviews"])
+            review_json = json.loads(self.session.get(url=steam_url).text)
+            new_reviews = review_json.get("reviews", [])
+            review_texts.extend(new_reviews)
 
             cursor = quote(review_json["cursor"])
 
-            if len(review_texts) > self.total_reviews:
+            if len(review_texts) >= self.total_reviews:
                 break
 
-        return review_texts
+        return review_texts[: self.total_reviews]
 
     def get_all_data(self):
 
-        self._get_game_info()
-        self._get_review_info()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            game_info_exec = executor.submit(self._get_game_info)
+            game_info_data = game_info_exec.result()
+            review_info_exec = executor.submit(self._get_review_info)
+            review_info_data = review_info_exec.result()
 
-        full_data = self.game_info | self.review_info
+        full_data = {**game_info_data, **review_info_data}
         review_data = self._get_review_data()
 
+        if not review_data:
+            full_data["debug_message"] = (
+                "No reviews were retrieved. The game may be new or have privacy restrictions."
+            )
         return full_data, review_data
 
     # steam_url = base_steam_url + f"&cursor={quote(cursor)}"

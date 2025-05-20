@@ -1,146 +1,42 @@
-# from flask import Flask, render_template, request, jsonify
-# from game_info_collector import GameTextData
-# import re
-# import plotly_express as px
-# from datetime import datetime, timedelta
-# import pandas as pd
-
-# app = Flask(__name__)
-
-
-# def aggregate_by_period(df, period):
-
-#     df_agg = df.copy()
-#     df_agg["date_of_creation"] = pd.to_datetime(df_agg["date_of_creation"])
-
-#     if period == "yearly":
-#         df_agg["period"] = df_agg["date_of_creation"].dt.year
-#         title = "Yearly Sentiment Analysis"
-#     elif period == "monthly":
-#         df_agg["period"] = df_agg["date_of_creation"].dt.strftime("%Y-%m")
-#         title = "Monthly Sentiment Analysis"
-#     elif period == "weekly":
-#         df_agg["period"] = df_agg["date_of_creation"].dt.strftime("%Y-%U")
-#         title = "Weekly Sentiment Analysis"
-#     elif period == "daily":
-#         # Filter to only the last 7 days for daily view
-#         df_agg = df_agg[
-#             df_agg["date_of_creation"]
-#             >= (df_agg["date_of_creation"].max() - timedelta(days=30))
-#         ].copy()
-#         df_agg["period"] = df_agg["date_of_creation"].dt.strftime("%Y-%m-%d")
-#         # title = "Daily Sentiment Analysis (Last 7 Days)"
-#     else:
-#         raise ValueError("Period must be one of: yearly, monthly, weekly, daily")
-
-#     # Group by period and review type
-#     grouped = (
-#         df_agg.groupby(["period", "review_rating"], as_index=False)
-#         .size()
-#         .sort_values(by="period")
-#         .reset_index()
-#     )
-
-#     return grouped
-
-
-# @app.route("/")
-# def index():
-#     return render_template("steam_analysis_landing.html")
-
-
-# @app.route("/submit", methods=["POST", "GET"])
-# def submit():
-
-#     username = request.values.get("gameUrl")
-#     app_id = re.search(r"app\/(\d+)", username).group(1)
-#     print(app_id)
-#     game_data = GameTextData(app_id, language="English", total_reviews=100)
-#     game_stats, review_data = game_data.get_all_data()
-#     print("It's working")
-#     chart_json_data = send_sentiment_data(review_data)
-#     print(f"Working {chart_json_data}")
-
-#     return render_template(
-#         "steam_analysis_dashboard.html",
-#         game_info=game_stats,
-#         chart_data=chart_json_data,
-#     )
-
-
-# def create_dataframe_for_chartjs(df):
-
-#     labels = df["period"].tolist()
-
-#     categories = [col for col in df.columns if col != "period"]
-
-#     datasets = []
-
-#     colors = [
-#         "rgba(255, 99, 132, 0.7)",  # Red
-#         "rgba(54, 162, 235, 0.7)",  # Blue
-#     ]
-
-#     for i, category in enumerate(categories):
-#         # Get the color for this category (cycle through colors if needed)
-#         color_index = i % len(colors)
-
-#         datasets.append(
-#             {
-#                 "label": category,
-#                 "data": df[category].tolist(),
-#                 "backgroundColor": colors[color_index],
-#             }
-#         )
-
-#     chart_data = {"labels": labels, "datasets": datasets}
-
-#     return chart_data
-
-
-# def send_sentiment_data(game_stats):
-
-#     sentiment_dict = {}
-
-#     # for user_reviews in review_data:
-
-#     sentiment_dict["review_rating"] = list(
-#         map(
-#             lambda x: "Positive" if x["voted_up"] is True else "Negative",
-#             game_stats,
-#         )
-#     )
-#     sentiment_dict["date_of_creation"] = list(
-#         map(
-#             lambda x: datetime.fromtimestamp(x["timestamp_created"]).strftime(
-#                 "%Y-%m-%d"
-#             ),
-#             game_stats,
-#         )
-#     )
-
-#     sentiment_df = pd.DataFrame(sentiment_dict)
-
-#     yearly_df = aggregate_by_period(sentiment_df, "yearly")
-#     monthly_df = aggregate_by_period(sentiment_df, "monthly")
-#     daily_df = aggregate_by_period(sentiment_df, "daily")
-
-#     chart_data = create_dataframe_for_chartjs(daily_df)
-
-#     return jsonify(chart_data)
-
-
-# if __name__ == "__main__":
-#     app.run(debug=True)
-
 from flask import Flask, render_template, request, jsonify
 from game_info_collector import GameTextData
 import re
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import time
+import threading
+from nlp import TextProcessor
+from wordcloud import WordCloud
+import numpy
+from io import BytesIO
+import base64
+from matplotlib.figure import Figure
 
 app = Flask(__name__)
+
+api_cache = {}
+cache_timeout = 3000
+
+
+def clean_cache():
+
+    while True:
+        current_time = time.time()
+        keys_cache = list(api_cache.keys())
+        print(api_cache)
+
+        for key in keys_cache:
+            if key in api_cache and current_time - api_cache[key]["timestamp"]:
+                del api_cache[key]
+
+        time.sleep(300)
+
+
+@app.before_request
+def start_cache_cleaning():
+    cache_thread = threading.Thread(target=clean_cache, daemon=True)
+    cache_thread.start()
 
 
 def aggregate_by_period(df, period):
@@ -200,18 +96,81 @@ def index():
 def submit():
     username = request.values.get("gameUrl")
     app_id = re.search(r"app\/(\d+)", username).group(1)
-    print(app_id)
-    game_data = GameTextData(app_id, language="all", total_reviews=1000)
-    game_stats, review_data = game_data.get_all_data()
-    print("It's working")
+
+    cache_key = f"app_{app_id}"
+    if (
+        cache_key in api_cache
+        and time.time() - api_cache[cache_key]["timestamp"] < cache_timeout
+    ):
+        game_stats = api_cache[cache_key]["game_stats"]
+        review_data = api_cache[cache_key]["review_data"]
+        print("Using cached data for", app_id)
+    else:
+        # Not in cache, fetch from API
+        print(f"Fetching data for app ID: {app_id}")
+
+        game_data = GameTextData(app_id, language="english", total_reviews=1000)
+        game_stats, review_data = game_data.get_all_data()
+
+        api_cache[cache_key] = {
+            "game_stats": game_stats,
+            "review_data": review_data,
+            "timestamp": time.time(),
+        }
     chart_data = create_sentiment_chart_data(review_data)
-    print(f"Working {chart_data}")
+    pos_wc = create_wordcloud(review_data, True)
+    neg_wc = create_wordcloud(review_data, False)
 
     return render_template(
         "steam_analysis_dashboard.html",
         game_info=game_stats,
         chart_data=json.dumps(chart_data),
+        pos_wc_data=pos_wc,
+        neg_wc_data=neg_wc,
     )
+
+
+def create_wordcloud(reviews, color_pos_neg: bool):
+    wc_review_data = list(
+        filter(
+            lambda user_review: user_review["voted_up"] is color_pos_neg,
+            reviews,
+        )
+    )
+
+    text_processor = TextProcessor()
+    processed_texts = text_processor.process_texts(
+        list(map(lambda x: x["review"], wc_review_data))
+    )
+    if color_pos_neg is True:
+        colormap = "Greens"
+    else:
+        colormap = "OrRd"
+
+    word_dict = " ".join(numpy.concatenate(processed_texts).tolist())
+    wc = WordCloud(
+        background_color="white",
+        max_words=100,
+        width=800,
+        height=400,
+        colormap=colormap,
+        contour_width=1,
+        contour_color="steelblue",
+        max_font_size=100,
+        random_state=42,
+    ).generate(word_dict)
+
+    # Display the wordcloud
+    fig = Figure()
+    ax = fig.subplots()
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+
+    buf = BytesIO()
+    wc.to_image().save(buf, format="PNG")
+
+    data = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return data
 
 
 def create_sentiment_chart_data(game_stats):
@@ -229,7 +188,10 @@ def create_sentiment_chart_data(game_stats):
     sentiment_df = pd.DataFrame(sentiment_dict)
 
     # Get aggregated data
-    daily_df = aggregate_by_period(sentiment_df, "daily")
+    daily_df = aggregate_by_period(sentiment_df, "monthly")
+
+    # if len(daily_df) <= 3:
+    #     daily_df = aggregate_by_period(sentiment_df, "monthly")
 
     # Create Chart.js data format
     labels = daily_df["period"].tolist()
@@ -251,10 +213,10 @@ def create_sentiment_chart_data(game_stats):
             }
         )
 
-    chart_data = {"labels": labels, "datasets": datasets}
+    chart_data = {"labels": daily_df["period"].tolist(), "datasets": datasets}
 
     return chart_data
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)

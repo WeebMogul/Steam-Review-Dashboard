@@ -12,7 +12,10 @@ from game_info_collector import GameTextData
 import calendar
 
 
-def create_wordcloud(word_dict, colormap):
+def create_wordcloud(
+    word_dict,
+    colormap,
+):
 
     word_dict = " ".join(numpy.concatenate(word_dict).tolist())
     wc = WordCloud(
