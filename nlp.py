@@ -458,14 +458,22 @@ class TextProcessor:
         # Return top 10 ngrams
         return ngram_freq
 
-    def get_topics(self, ngram_data, n_topics=5, n_gram_words=3):
+    def get_topics(self, ngram_data, n_topics=7, n_gram_words=3):
 
         pre_fixed_data = list(map(lambda x: " ".join(x), ngram_data))
 
         vec = CountVectorizer(ngram_range=(2, n_gram_words))
         vec_data = vec.fit_transform(pre_fixed_data)
 
-        lda = LatentDirichletAllocation(n_components=n_topics, random_state=42)
+        lda = LatentDirichletAllocation(
+            n_components=n_topics,
+            random_state=42,
+            max_iter=25,
+            learning_method="batch",
+            n_jobs=1,
+            doc_topic_prior=0.1,
+            topic_word_prior=0.01,
+        )
         lda.fit_transform(vec_data)
 
         topic_words = []

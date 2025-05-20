@@ -17,6 +17,7 @@ app = Flask(__name__)
 
 api_cache = {}
 cache_timeout = 3000
+text_processor = TextProcessor()
 
 
 class GameData:
@@ -96,7 +97,7 @@ def aggregate_by_period(df, period):
     return pivot_df
 
 
-@app.route("/")
+@app.route("/home", methods=["POST", "GET"])
 def index():
     return render_template("steam_analysis_landing.html")
 
@@ -183,6 +184,29 @@ def create_wordcloud(reviews, color_pos_neg: bool):
 
     data = base64.b64encode(buf.getvalue()).decode("utf-8")
     return data
+
+
+@app.get("/topic_modelling_table")
+def get_important_topics():
+
+    pos_review_data = list(
+        filter(
+            lambda user_review: user_review["voted_up"] is True,
+            game_datas.review_data,
+        )
+    )
+    pos_processed_texts = text_processor.process_texts(
+        list(map(lambda x: x["review"], pos_review_data))
+    )
+    pos_topics_dict = text_processor.get_topics(pos_processed_texts, n_gram_words=5)
+
+    pos_topic_df = pd.DataFrame(pos_topics_dict)
+
+    pos_topic_html = pos_topic_df.to_html(
+        classes="table table-striped table-hover", index=False
+    )
+
+    return jsonify({"html_table": pos_topic_html})
 
 
 @app.get("/sentiment_chart_data")
