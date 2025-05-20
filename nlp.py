@@ -344,6 +344,10 @@ steamReviewStopwords = [
     "game",
 ]
 
+nltk.download("stopwords")
+nltk.download("punkt")
+nltk.download("wordnet")
+
 
 def create_wordcloud(word_dict, colormap):
     wc = WordCloud(
