@@ -369,9 +369,9 @@ https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js
                     <div class="card-header bg-white">
                         <h5 class="mb-0">Top Mentioned Features</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="chart-container" id='table-land'>
-                        </div>
+                    <div class="card-body" id="table_data">
+                        
+                    </div>
                     </div>
                 </div>
             </div>
@@ -408,7 +408,7 @@ https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js
             fetch(`/topic_modelling_table`).then(response => response.json()).then(data => 
             {
                 console.log(data.html_table)
-                document.getElementById('table-land').innerHTML = data.html_table;
+                document.getElementById('table_data').innerHTML = data.html_table;
             });
         }
         

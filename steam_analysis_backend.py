@@ -97,7 +97,7 @@ def aggregate_by_period(df, period):
     return pivot_df
 
 
-@app.route("/home", methods=["POST", "GET"])
+@app.route("/", methods=["POST", "GET"])
 def index():
     return render_template("steam_analysis_landing.html")
 
@@ -119,7 +119,7 @@ def submit():
         # Not in cache, fetch from API
         print(f"Fetching data for app ID: {app_id}")
 
-        game_data = GameTextData(app_id, language="english", total_reviews=1000)
+        game_data = GameTextData(app_id, language="english", total_reviews=10000)
         game_stats, review_data = game_data.get_all_data()
 
         game_datas.game_info = game_stats
