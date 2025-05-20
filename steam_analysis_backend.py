@@ -19,12 +19,21 @@ api_cache = {}
 cache_timeout = 3000
 
 
+class GameData:
+
+    game_info = ""
+    review_info = ""
+    review_data = ""
+
+
+game_datas = GameData()
+
+
 def clean_cache():
 
     while True:
         current_time = time.time()
         keys_cache = list(api_cache.keys())
-        print(api_cache)
 
         for key in keys_cache:
             if key in api_cache and current_time - api_cache[key]["timestamp"]:
@@ -112,19 +121,22 @@ def submit():
         game_data = GameTextData(app_id, language="english", total_reviews=1000)
         game_stats, review_data = game_data.get_all_data()
 
+        game_datas.game_info = game_stats
+        game_datas.review_data = review_data
+
         api_cache[cache_key] = {
             "game_stats": game_stats,
             "review_data": review_data,
             "timestamp": time.time(),
         }
-    chart_data = create_sentiment_chart_data(review_data)
+    # chart_data = create_sentiment_chart_data(review_data)
+    glob_review = review_data
     pos_wc = create_wordcloud(review_data, True)
     neg_wc = create_wordcloud(review_data, False)
 
     return render_template(
         "steam_analysis_dashboard.html",
         game_info=game_stats,
-        chart_data=json.dumps(chart_data),
         pos_wc_data=pos_wc,
         neg_wc_data=neg_wc,
     )
@@ -173,8 +185,11 @@ def create_wordcloud(reviews, color_pos_neg: bool):
     return data
 
 
-def create_sentiment_chart_data(game_stats):
+@app.get("/sentiment_chart_data")
+def create_sentiment_chart_data():
     # Extract sentiment data from game stats
+    game_stats = game_datas.review_data
+    print(game_stats)
     sentiment_dict = {
         "review_rating": [
             "Positive" if review["voted_up"] else "Negative" for review in game_stats
@@ -187,14 +202,13 @@ def create_sentiment_chart_data(game_stats):
 
     sentiment_df = pd.DataFrame(sentiment_dict)
 
+    time_filter = request.args.get("time_filter", "daily")
+
     # Get aggregated data
-    daily_df = aggregate_by_period(sentiment_df, "monthly")
+    daily_df = aggregate_by_period(sentiment_df, time_filter)
 
     # if len(daily_df) <= 3:
     #     daily_df = aggregate_by_period(sentiment_df, "monthly")
-
-    # Create Chart.js data format
-    labels = daily_df["period"].tolist()
 
     # Define colors for sentiment categories
     colors = {
