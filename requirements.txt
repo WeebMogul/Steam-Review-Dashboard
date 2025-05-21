@@ -16,14 +16,14 @@ Jinja2==3.1.6
 joblib==1.5.0
 kiwisolver==1.4.8
 MarkupSafe==3.0.2
-matplotlib==3.10.3
+matplotlib
 narwhals==1.40.0
 nltk==3.9.1
 numpy==2.2.6
 packaging==25.0
 pandas==2.2.3
 pillow==11.2.1
-plotly==6.1.0
+plotly
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 pytz==2025.2
@@ -40,4 +40,4 @@ tzdata==2025.2
 urllib3==2.4.0
 Werkzeug==3.1.3
 wordcloud==1.9.4
-streamlit==1.45.1
+streamlit
