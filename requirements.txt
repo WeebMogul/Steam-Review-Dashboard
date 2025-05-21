@@ -41,3 +41,4 @@ urllib3
 Werkzeug
 wordcloud
 streamlit
+imghdr
