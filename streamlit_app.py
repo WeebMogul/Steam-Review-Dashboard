@@ -195,7 +195,7 @@ if st.button("Click"):
     game_data = GameTextData(
         app_id, language="english", total_reviews=no_of_comments, from_days=no_of_days
     )
-    game_json = game_data.get_all_data()
+    game_json, review_data = game_data.get_all_data()
 
     # Create a card using markdown with HTML
     st.markdown(
@@ -234,7 +234,7 @@ if st.button("Click"):
         pos_review_data = list(
             filter(
                 lambda user_review: user_review["voted_up"] is True,
-                game_json["review_data"],
+                review_data,
             )
         )
 
@@ -259,7 +259,7 @@ if st.button("Click"):
         neg_review_data = list(
             filter(
                 lambda user_review: user_review["voted_up"] is False,
-                game_json["review_data"],
+                review_data,
             )
         )
 
@@ -286,7 +286,7 @@ if st.button("Click"):
     sentiment_dict["review_rating"] = list(
         map(
             lambda x: "Positive" if x["voted_up"] is True else "Negative",
-            game_json["review_data"],
+            review_data,
         )
     )
     sentiment_dict["date_of_creation"] = list(
@@ -294,7 +294,7 @@ if st.button("Click"):
             lambda x: datetime.fromtimestamp(x["timestamp_created"]).strftime(
                 "%Y-%m-%d"
             ),
-            game_json["review_data"],
+            review_data,
         )
     )
 
