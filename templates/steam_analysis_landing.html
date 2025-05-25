@@ -5,46 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Steam Review Analysis</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --light-blue: #e6f2ff;
-        }
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .hero-section {
-            background-color: var(--light-blue);
-            padding: 80px 0;
-        }
-        .navbar {
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .navbar-brand {
-            font-weight: bold;
-            color: var(--primary-color) !important;
-        }
-        .btn-primary {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border: none;
-        }
-        .steam-logo {
-            max-height: 30px;
-            margin-right: 8px;
-        }
-        .footer {
-            background-color: white;
-            padding: 20px 0;
-            margin-top: 50px;
-        }
-    </style>
+    <link rel="stylesheet" href="{{url_for('static',filename='steam_analysis.css')}}">
 </head>
 <body>
     <!-- Navigation Bar -->

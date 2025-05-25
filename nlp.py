@@ -12,345 +12,18 @@ from wordcloud import WordCloud
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 import json
 from sklearn.decomposition import LatentDirichletAllocation
+from nltk.probability import FreqDist
+from nltk import bigrams, ngrams
 
-steamReviewStopwords = [
-    "a",
-    "about",
-    "above",
-    "after",
-    "again",
-    "against",
-    "all",
-    "am",
-    "an",
-    "and",
-    "any",
-    "are",
-    "aren't",
-    "as",
-    "at",
-    "be",
-    "because",
-    "been",
-    "before",
-    "being",
-    "below",
-    "between",
-    "both",
-    "but",
-    "by",
-    "can",
-    "can't",
-    "cannot",
-    "could",
-    "couldn't",
-    "did",
-    "didn't",
-    "do",
-    "does",
-    "doesn't",
-    "doing",
-    "don't",
-    "down",
-    "during",
-    "each",
-    "few",
-    "for",
-    "from",
-    "further",
-    "had",
-    "hadn't",
-    "has",
-    "hasn't",
-    "have",
-    "haven't",
-    "having",
-    "he",
-    "he'd",
-    "he'll",
-    "he's",
-    "her",
-    "here",
-    "here's",
-    "hers",
-    "herself",
-    "him",
-    "himself",
-    "his",
-    "how",
-    "how's",
-    "i",
-    "i'd",
-    "i'll",
-    "i'm",
-    "i've",
-    "if",
-    "in",
-    "into",
-    "is",
-    "isn't",
-    "it",
-    "it's",
-    "its",
-    "itself",
-    "let's",
-    "me",
-    "more",
-    "most",
-    "mustn't",
-    "my",
-    "myself",
-    "no",
-    "nor",
-    "not",
-    "of",
-    "off",
-    "on",
-    "once",
-    "only",
-    "or",
-    "other",
-    "ought",
-    "our",
-    "ours",
-    "ourselves",
-    "out",
-    "over",
-    "own",
-    "same",
-    "shan't",
-    "she",
-    "she'd",
-    "she'll",
-    "she's",
-    "should",
-    "shouldn't",
-    "so",
-    "some",
-    "such",
-    "than",
-    "that",
-    "that's",
-    "the",
-    "their",
-    "theirs",
-    "them",
-    "themselves",
-    "then",
-    "there",
-    "there's",
-    "these",
-    "they",
-    "they'd",
-    "they'll",
-    "they're",
-    "they've",
-    "this",
-    "those",
-    "through",
-    "to",
-    "too",
-    "under",
-    "until",
-    "up",
-    "very",
-    "was",
-    "wasn't",
-    "we",
-    "we'd",
-    "we'll",
-    "we're",
-    "we've",
-    "were",
-    "weren't",
-    "what",
-    "what's",
-    "when",
-    "when's",
-    "where",
-    "where's",
-    "which",
-    "while",
-    "who",
-    "who's",
-    "whom",
-    "why",
-    "why's",
-    "with",
-    "won't",
-    "would",
-    "wouldn't",
-    "you",
-    "you'd",
-    "you'll",
-    "you're",
-    "you've",
-    "your",
-    "yours",
-    "yourself",
-    "yourselves",
-    "game",
-    "play",
-    "played",
-    "playing",
-    "gameplay",
-    "games",
-    "steam",
-    "review",
-    "reviews",
-    "player",
-    "players",
-    "hours",
-    "hour",
-    "playtime",
-    "playthrough",
-    "playthroughs",
-    "session",
-    "sessions",
-    "buy",
-    "bought",
-    "purchase",
-    "purchased",
-    "purchasing",
-    "price",
-    "paid",
-    "recommend",
-    "recommended",
-    "recommendation",
-    "worth",
-    "worthwhile",
-    "experience",
-    "experiences",
-    "experienced",
-    "time",
-    "times",
-    "minute",
-    "minutes",
-    "second",
-    "seconds",
-    "dlc",
-    "content",
-    "update",
-    "updates",
-    "patch",
-    "patches",
-    "version",
-    "developer",
-    "developers",
-    "dev",
-    "devs",
-    "publisher",
-    "publishers",
-    "run",
-    "runs",
-    "running",
-    "ran",
-    "feels",
-    "feeling",
-    "feel",
-    "felt",
-    "like",
-    "liked",
-    "likes",
-    "liking",
-    "love",
-    "loves",
-    "loved",
-    "loving",
-    "hate",
-    "hates",
-    "hated",
-    "hating",
-    "good",
-    "bad",
-    "great",
-    "terrible",
-    "awesome",
-    "amazing",
-    "awful",
-    "horrible",
-    "better",
-    "best",
-    "worse",
-    "worst",
-    "just",
-    "really",
-    "very",
-    "quite",
-    "pretty",
-    "extremely",
-    "somewhat",
-    "overall",
-    "basically",
-    "think",
-    "thought",
-    "thinking",
-    "thinks",
-    "get",
-    "gets",
-    "getting",
-    "got",
-    "gotten",
-    "use",
-    "uses",
-    "using",
-    "used",
-    "need",
-    "needs",
-    "needed",
-    "needing",
-    "want",
-    "wants",
-    "wanted",
-    "wanting",
-    "try",
-    "tries",
-    "tried",
-    "trying",
-    "way",
-    "ways",
-    "one",
-    "ones",
-    "two",
-    "three",
-    "thing",
-    "things",
-    "make",
-    "makes",
-    "making",
-    "made",
-    "see",
-    "sees",
-    "seeing",
-    "saw",
-    "seen",
-    "look",
-    "looks",
-    "looking",
-    "looked",
-    "well",
-    "fine",
-    "even",
-    "still",
-    "though",
-    "although",
-    "however",
-    "also",
-    "too",
-    "first",
-    "last",
-    "next",
-    "previous",
-    "game",
-]
 
 nltk.download("stopwords")
 nltk.download("punkt")
 nltk.download("wordnet")
+nltk.download("punkt_tab")
 
 
 def create_wordcloud(word_dict, colormap):
-    wc = WordCloud(
+    return WordCloud(
         background_color="white",
         max_words=100,
         width=800,
@@ -361,8 +34,6 @@ def create_wordcloud(word_dict, colormap):
         max_font_size=100,
         random_state=42,
     ).generate_from_frequencies(word_dict)
-
-    return wc
 
 
 # review_sample = review_data[:10]
@@ -398,42 +69,46 @@ class TextProcessor:
     def clean_text(self, text):
 
         text = re.sub(r"https?://\S+|www\.\S+", "", text)
-        text = re.sub(r"[^\w\s\']", "", text)
+        text = re.sub(r"[^\w\s]", "", text)
         text = re.sub(r"\d+", "", text)
         text = text.lower()
 
         words = text.split()
 
-        if len(words) >= 50:
-
+        if len(words) < 50:
+            processed_words = [""]
+        else:
             processed_words = []
             for word in words:
-                if word not in self.stop_words and word not in steamReviewStopwords:
+                if word not in self.stop_words:
                     lemmatized_word = self.lemmatizer.lemmatize(word)
                     processed_words.append(lemmatized_word)
-
-            return processed_words
-        else:
-            return [" "]
+        return processed_words
 
     def process_texts(self, texts):
 
         processed_texts = []
-        for text in texts:
-            processed_texts.append(self.clean_text(text))
+        processed_texts.extend(self.clean_text(text) for text in texts)
         return processed_texts
 
     def get_word_freq(self, processed_texts, n=10):
 
         all_words = []
-        for words in processed_texts:
-            all_words.extend(words)
+        # for words in processed_texts:
+        #     all_words.extend(words)
 
         # Count word frequencies
-        word_freq = Counter(all_words)
+        words = nltk.tokenize.word_tokenize(" ".join(processed_texts))
+        fdist = FreqDist(ngrams(words, 2)).most_common(10)
+        # for wird in fdist:
+        #     all_words.append({"_".join(wird[0]), wird[1]})
+        all_words.extend(
+            {"bigram": "_".join(wird[0]), "count": wird[1]} for wird in fdist
+        )
 
+        print(all_words)
         # Return top n words
-        return word_freq.most_common(n)
+        return pd.DataFrame(all_words).sort_values(by="count", ascending=True)
 
     def generate_word_cloud(self, processed_texts):
 
@@ -445,10 +120,7 @@ class TextProcessor:
         text = " ".join(all_words)
 
         # Generate word cloud
-        wordcloud = WordCloud(width=800, height=400, background_color="white").generate(
-            text
-        )
-        return wordcloud
+        return WordCloud(width=800, height=400, background_color="white").generate(text)
 
     def extract_ngrams(self, processed_texts, n=2):
 
@@ -456,11 +128,8 @@ class TextProcessor:
         for words in processed_texts:
             all_ngrams.extend(list(ngrams(words, n)))
 
-        # Count ngram frequencies
-        ngram_freq = Counter(all_ngrams)
-
         # Return top 10 ngrams
-        return ngram_freq
+        return Counter(all_ngrams)
 
     def get_topics(self, ngram_data, n_topics=7, n_gram_words=3):
 
@@ -489,8 +158,10 @@ class TextProcessor:
         # get the topics and each word per topic
         for idx, topic in enumerate(lda.components_):
 
-            for i in topic.argsort()[: -top_n - 1 : -1]:
-                topic_words.append((vec.get_feature_names_out()[i]))
+            topic_words.extend(
+                vec.get_feature_names_out()[i]
+                for i in topic.argsort()[: -top_n - 1 : -1]
+            )
 
             topic_collection.append(topic_words[:])
             topic_no.append(f"Topic {idx+1}")
@@ -505,22 +176,29 @@ if __name__ == "__main__":
         game_data = json.load(file)
 
     texts = list(
-        map(lambda user_review: user_review["review"], game_data["review_data"])
+        filter(
+            lambda user_review: user_review["language"] == "english",
+            game_data["review_data"],
+        )
     )
+
+    texts = list(map(lambda user_reviews: user_reviews["review"], texts))
 
     # Create a text processor instance
     processor = TextProcessor()
 
     # # Process the texts
     processed_texts = processor.process_texts(texts)
-    print("Processed texts:")
     for i, tokens in enumerate(processed_texts):
         print(f"Text {i+1}: {tokens}")
 
     # # Get word frequencies
     print("\nTop 10 words by frequency:")
-    word_freqs = processor.get_word_freq(processed_texts)
-    for word, freq in word_freqs:
+    pro_text = list(map(lambda x: " ".join(x), processed_texts))
+    word_freqs = processor.get_word_freq(pro_text)
+    for i, (word, freq) in enumerate(dict(word_freqs).items()):
+        if i > 10:
+            break
         print(f"{word}: {freq}")
 
     # # Generate word cloud

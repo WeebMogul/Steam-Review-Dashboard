@@ -8,7 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 class GameTextData:
 
-    def __init__(self, app_id, language="all", from_days=0, total_reviews=100):
+    def __init__(
+        self,
+        app_id,
+        total_reviews=None,
+        language="all",
+        from_days=9223372036854775807,
+    ):
         self.app_id = app_id
         self.steam_game_url = (
             f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=ae"
@@ -107,14 +113,14 @@ class GameTextData:
         cursor = "*"
         review_texts = []
 
-        num_requests = min(5, (self.total_reviews + 99) // 100)
+        if self.total_reviews is None:
+            self.total_reviews = self.review_info["total_review_count"]
 
-        for i in range(num_requests):
+        num_requests = max(5, ((self.total_reviews + 99) // 100))
 
-            steam_url = (
-                self.base_review_url
-                + f"&language={self.language}&day_range={self.till_date}&cursor={cursor}"
-            )
+        for _ in range(num_requests):
+
+            steam_url = f"{self.base_review_url}&language={self.language}&day_range={self.till_date}&cursor={cursor}"
 
             review_json = json.loads(self.session.get(url=steam_url).text)
             new_reviews = review_json.get("reviews", [])

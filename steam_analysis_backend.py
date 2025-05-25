@@ -12,6 +12,7 @@ import numpy
 from io import BytesIO
 import base64
 from matplotlib.figure import Figure
+import numpy as np
 
 app = Flask(__name__)
 
@@ -59,9 +60,6 @@ def aggregate_by_period(df, period):
     elif period == "monthly":
         df_agg["period"] = df_agg["date_of_creation"].dt.strftime("%Y-%m")
         title = "Monthly Sentiment Analysis"
-    elif period == "weekly":
-        df_agg["period"] = df_agg["date_of_creation"].dt.strftime("%Y-%U")
-        title = "Weekly Sentiment Analysis"
     elif period == "daily":
         # Filter to only the last 30 days for daily view
         df_agg = df_agg[
@@ -105,7 +103,7 @@ def index():
 @app.route("/submit", methods=["POST", "GET"])
 def submit():
     username = request.values.get("gameUrl")
-    app_id = re.search(r"app\/(\d+)", username).group(1)
+    app_id = re.search(r"app\/(\d+)", username)[1]
 
     cache_key = f"app_{app_id}"
     if (
@@ -119,7 +117,7 @@ def submit():
         # Not in cache, fetch from API
         print(f"Fetching data for app ID: {app_id}")
 
-        game_data = GameTextData(app_id, language="english", total_reviews=10000)
+        game_data = GameTextData(app_id, language="english")
         game_stats, review_data = game_data.get_all_data()
 
         game_datas.game_info = game_stats
@@ -131,7 +129,6 @@ def submit():
             "timestamp": time.time(),
         }
     # chart_data = create_sentiment_chart_data(review_data)
-    glob_review = review_data
     pos_wc = create_wordcloud(review_data, True)
     neg_wc = create_wordcloud(review_data, False)
 
@@ -144,10 +141,15 @@ def submit():
 
 
 def create_wordcloud(reviews, color_pos_neg: bool):
+
+    vote_scores = list(map(lambda review: review["weighted_vote_score"], reviews))
+    sorted_voted_index = np.argsort(vote_scores)[::-1]
+
+    sorted_reviews = [reviews[i] for i in sorted_voted_index]
     wc_review_data = list(
         filter(
             lambda user_review: user_review["voted_up"] is color_pos_neg,
-            reviews,
+            sorted_reviews[:400],
         )
     )
 
@@ -155,10 +157,7 @@ def create_wordcloud(reviews, color_pos_neg: bool):
     processed_texts = text_processor.process_texts(
         list(map(lambda x: x["review"], wc_review_data))
     )
-    if color_pos_neg is True:
-        colormap = "Greens"
-    else:
-        colormap = "OrRd"
+    colormap = "Greens" if color_pos_neg else "OrRd"
 
     word_dict = " ".join(numpy.concatenate(processed_texts).tolist())
     wc = WordCloud(
@@ -182,8 +181,7 @@ def create_wordcloud(reviews, color_pos_neg: bool):
     buf = BytesIO()
     wc.to_image().save(buf, format="PNG")
 
-    data = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return data
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 @app.get("/topic_modelling_table")
@@ -213,7 +211,6 @@ def get_important_topics():
 def create_sentiment_chart_data():
     # Extract sentiment data from game stats
     game_stats = game_datas.review_data
-    print(game_stats)
     sentiment_dict = {
         "review_rating": [
             "Positive" if review["voted_up"] else "Negative" for review in game_stats
@@ -226,13 +223,10 @@ def create_sentiment_chart_data():
 
     sentiment_df = pd.DataFrame(sentiment_dict)
 
-    time_filter = request.args.get("time_filter", "daily")
+    time_filter = request.args.get("time_filter", "yearly")
 
     # Get aggregated data
     daily_df = aggregate_by_period(sentiment_df, time_filter)
-
-    # if len(daily_df) <= 3:
-    #     daily_df = aggregate_by_period(sentiment_df, "monthly")
 
     # Define colors for sentiment categories
     colors = {
@@ -251,10 +245,8 @@ def create_sentiment_chart_data():
             }
         )
 
-    chart_data = {"labels": daily_df["period"].tolist(), "datasets": datasets}
-
-    return chart_data
+    return {"labels": daily_df["period"].tolist(), "datasets": datasets}
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

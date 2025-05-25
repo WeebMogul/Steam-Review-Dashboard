@@ -11,6 +11,8 @@ import re
 from game_info_collector import GameTextData
 import calendar
 
+st.set_page_config(page_title="Sentiment Analysis Dashboard", layout="wide")
+
 
 def create_wordcloud(
     word_dict,
@@ -18,7 +20,7 @@ def create_wordcloud(
 ):
 
     word_dict = " ".join(numpy.concatenate(word_dict).tolist())
-    wc = WordCloud(
+    return WordCloud(
         background_color="white",
         max_words=100,
         width=800,
@@ -30,7 +32,10 @@ def create_wordcloud(
         random_state=42,
     ).generate(word_dict)
 
-    return wc
+
+def render_word_count(sentiment_df):
+
+    print(sentiment_df)
 
 
 @st.fragment
@@ -83,6 +88,53 @@ def render_chart(sentiment_df):
     return fig
 
 
+@st.fragment
+def bar_and_cloud(review_data, sentiment):
+
+    text_processor = TextProcessor()
+
+    review_data = list(
+        filter(
+            lambda user_review: (
+                user_review["voted_up"] is True
+                if sentiment == "Positive"
+                else user_review["voted_up"] is False
+            ),
+            review_data,
+        )
+    )
+
+    processed_texts = text_processor.process_texts(
+        list(map(lambda x: x["review"], review_data))
+    )
+
+    pro_text = list(map(lambda x: " ".join(x), processed_texts))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        word_freqs = text_processor.get_word_freq(pro_text)
+
+        fig = px.bar(word_freqs, y="bigram", x="count", orientation="h")
+
+        key_plot = "negative" if sentiment == "Negative" else "positive"
+
+        st.plotly_chart(fig, key=key_plot, use_container_width=True)
+
+    with col2:
+
+        negative_wc = create_wordcloud(
+            processed_texts, "OrRd" if sentiment == "Negative" else "Greens"
+        )
+
+        # Display the wordcloud
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(negative_wc, interpolation="bilinear")
+        ax.axis("off")
+        st.markdown("")
+        st.pyplot(fig)
+        plt.close()
+
+
 def aggregate_by_period(df, period):
 
     df_agg = df.copy()
@@ -109,14 +161,12 @@ def aggregate_by_period(df, period):
         raise ValueError("Period must be one of: yearly, monthly, weekly, daily")
 
     # Group by period and review type
-    grouped = (
+    return (
         df_agg.groupby(["period", "review_rating"], as_index=False)
         .size()
         .sort_values(by="period")
         .reset_index()
     )
-
-    return grouped
 
 
 st.markdown(
@@ -190,7 +240,7 @@ no_of_days = datetime.now().day - date_input.day
 
 if st.button("Click"):
 
-    app_id = re.search(r"app\/(\d+)", url).group(1)
+    app_id = re.search(r"app\/(\d+)", url)[1]
     st.toast("Warming up...")
     game_data = GameTextData(
         app_id, language="english", total_reviews=no_of_comments, from_days=no_of_days
@@ -222,97 +272,53 @@ if st.button("Click"):
 
     # Split for positive and negative speeches
 
-    text_processor = TextProcessor()
+    pos_tab, neg_tab = st.tabs(["Positive", "Negative"])
 
-    col1, col2 = st.columns(2)
+    with pos_tab:
 
-    with col1:
-        st.markdown(
-            "<div class='card'><div class='card-title'>Positive Word Cloud</div>",
-            unsafe_allow_html=True,
-        )
-        pos_review_data = list(
-            filter(
-                lambda user_review: user_review["voted_up"] is True,
+        bar_and_cloud(review_data, "Positive")
+
+    with neg_tab:
+
+        bar_and_cloud(review_data, "Negative")
+
+    # st.markdown(
+    #     "<div class='card'><div class='card-title'>Sentiment Over Time</div>",
+    #     unsafe_allow_html=True,
+    # )
+    sentiment_dict = {
+        "review_rating": list(
+            map(
+                lambda x: "Positive" if x["voted_up"] is True else "Negative",
                 review_data,
             )
-        )
-
-        pos_processed_texts = text_processor.process_texts(
-            list(map(lambda x: x["review"], pos_review_data))
-        )
-        positive_wc = create_wordcloud(pos_processed_texts, "Greens")
-
-        # Display the wordcloud
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.imshow(positive_wc, interpolation="bilinear")
-        ax.axis("off")
-        st.pyplot(fig)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col2:
-        st.markdown(
-            "<div class='card'><div class='card-title'>Negative Word Cloud</div>",
-            unsafe_allow_html=True,
-        )
-
-        neg_review_data = list(
-            filter(
-                lambda user_review: user_review["voted_up"] is False,
+        ),
+        "date_of_creation": list(
+            map(
+                lambda x: datetime.fromtimestamp(x["timestamp_created"]).strftime(
+                    "%Y-%m-%d"
+                ),
                 review_data,
             )
-        )
-
-        neg_processed_texts = text_processor.process_texts(
-            list(map(lambda x: x["review"], neg_review_data))
-        )
-        negative_wc = create_wordcloud(neg_processed_texts, "OrRd")
-
-        # Display the wordcloud
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.imshow(negative_wc, interpolation="bilinear")
-        ax.axis("off")
-        st.pyplot(fig)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(
-        "<div class='card'><div class='card-title'>Sentiment Over Time</div>",
-        unsafe_allow_html=True,
-    )
-    sentiment_dict = {}
-
-    # for user_reviews in review_data:
-
-    sentiment_dict["review_rating"] = list(
-        map(
-            lambda x: "Positive" if x["voted_up"] is True else "Negative",
-            review_data,
-        )
-    )
-    sentiment_dict["date_of_creation"] = list(
-        map(
-            lambda x: datetime.fromtimestamp(x["timestamp_created"]).strftime(
-                "%Y-%m-%d"
-            ),
-            review_data,
-        )
-    )
+        ),
+    }
 
     sentiment_df = pd.DataFrame(sentiment_dict)
     render_chart(sentiment_df)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(
-        "<div class='card'><div class='card-title'>Most Relevant Topics</div>",
-        unsafe_allow_html=True,
-    )
+    # st.markdown(
+    #     "<div class='card'><div class='card-title'>Most Relevant Topics</div>",
+    #     unsafe_allow_html=True,
+    # )
 
-    positive_tab, negative_tab = st.tabs(["Positive Topics", "Negative Topics"])
+    # text_processor = TextProcessor()
+    # positive_tab, negative_tab = st.tabs(["Positive Topics", "Negative Topics"])
 
-    with positive_tab:
-        st.table(text_processor.get_topics(pos_processed_texts, n_gram_words=5))
+    # with positive_tab:
+    #     st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
 
-    with negative_tab:
-        st.table(text_processor.get_topics(neg_processed_texts, n_gram_words=5))
+    # with negative_tab:
+    #     st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    # st.markdown("</div>", unsafe_allow_html=True)
