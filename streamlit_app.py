@@ -231,7 +231,9 @@ st.title("Steam Review Analysis")
 url = st.text_input("Enter URL", placeholder="Enter the URL")
 
 st.sidebar.title("Filter ")
-no_of_comments = st.sidebar.radio("Select amount of comments", [1000, 5000, 10000])
+no_of_comments = st.sidebar.radio(
+    "Select amount of comments", [1000, 5000, 10000, "all_comments"]
+)
 date_input = st.sidebar.date_input(
     "Enter Date", min_value=(datetime.now() - timedelta(365)), max_value=datetime.now()
 )
@@ -312,13 +314,42 @@ if st.button("Click"):
     #     unsafe_allow_html=True,
     # )
 
-    # text_processor = TextProcessor()
-    # positive_tab, negative_tab = st.tabs(["Positive Topics", "Negative Topics"])
+    text_processor = TextProcessor()
+    positive_tab, negative_tab = st.tabs(["Positive Topics", "Negative Topics"])
 
-    # with positive_tab:
-    #     st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
+    with positive_tab:
 
-    # with negative_tab:
-    #     st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
+        text_processor = TextProcessor()
+
+        review_data = list(
+            filter(
+                lambda user_review: (user_review["voted_up"] is True),
+                review_data,
+            )
+        )
+
+        processed_texts = text_processor.process_texts(
+            list(map(lambda x: x["review"], review_data))
+        )
+
+        pro_text = list(map(lambda x: " ".join(x), processed_texts))
+        st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
+
+    with negative_tab:
+        text_processor = TextProcessor()
+
+        review_data = list(
+            filter(
+                lambda user_review: (user_review["voted_up"] is False),
+                review_data,
+            )
+        )
+
+        processed_texts = text_processor.process_texts(
+            list(map(lambda x: x["review"], review_data))
+        )
+
+        pro_text = list(map(lambda x: " ".join(x), processed_texts))
+        st.table(text_processor.get_topics(processed_texts, n_gram_words=5))
 
     # st.markdown("</div>", unsafe_allow_html=True)

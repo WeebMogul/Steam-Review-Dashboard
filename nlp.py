@@ -131,7 +131,7 @@ class TextProcessor:
         # Return top 10 ngrams
         return Counter(all_ngrams)
 
-    def get_topics(self, ngram_data, n_topics=7, n_gram_words=3):
+    def get_topics(self, ngram_data, n_topics=4, n_gram_words=3):
 
         pre_fixed_data = list(map(lambda x: " ".join(x), ngram_data))
 

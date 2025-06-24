@@ -21,7 +21,7 @@ class GameTextData:
         )
         self.base_review_url = f"https://store.steampowered.com/appreviews/{app_id}?json=1&num_per_page=100"
         self.language = language
-        self.from_days = from_days
+        self.from_days = 9223372036854775807
         self.game_info = {}
         self.review_info = {}
         self.till_date = from_days
@@ -113,7 +113,7 @@ class GameTextData:
         cursor = "*"
         review_texts = []
 
-        if self.total_reviews is None:
+        if self.total_reviews is None or self.total_reviews == "all_comments":
             self.total_reviews = self.review_info["total_review_count"]
 
         num_requests = max(5, ((self.total_reviews + 99) // 100))
